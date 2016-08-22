@@ -1,0 +1,5 @@
+#ifndef IDRIVERUPDATE
+#define IDRIVERUPDATE
+
+#endif // IDRIVERUPDATE
+

@@ -1,0 +1,65 @@
+﻿==========================================20160804
+-------------v0.1规划-----------
+一、静态设计
+1、设计driver类。
+    a.维护一个address和tagID的哈希表。
+    b.每个driver由定时器控制，定时读写数据，定时间隔长度rollInterv。在driverManager中为每个driver开设独立线程。rollInterv变化时，driver会通知每一个自己的数据点。
+    c.driver对地址进行排序，优化出一个实际读写区间，优化读速度。（可选）
+    d.UI中修改tagItem的对应的address时，会调用verify方法。
+    e.应该有一个systemDriver，作为测试用。
+    f.两种write方式。一种是轮询完read，再写writePending数据点。另一种，是立即write的slot，传入参数为（&tagID）。
+    g.driver要能得到tagManager的指针。用来找tag。
+    h.driver有一个类型和一个名称。在driverManager中还有一个UUID。
+    i.driver与实际设备通信。带有启动、停止、重启和初始化的接口。
+    j.driver有状态、错误。继承自baseDevice。
+2、设计repeater类
+    a.repeater类功能与driver类相似。主要区别是repeater类不能改写tagItem。repeater类对于tagItem是只读的。
+    b.repeater类主要是作为server，响应某个外部设备的，读取tagItem的请求。
+3、设计driverManager类。
+    a.driverManager负责管理本机所有的driver，维护一个driverID和driver*的QList。
+    b.driverManager可以新增、删除driver。
+    c.driverManager管理driver的激活。对于同一个tagItem，如果在两个driver中都有address，即tagItem对应两个设备的相同的地址。这两个driver就不能同时激活（认为有冲突）。
+      driverManager激活driver时必须判断冲突。有冲突不允许同时激活。
+    d.repeater激活无此限制。
+
+二、动态设计
+1、开机初始化：driverManager调用load函数，从文件中读取本身以及新建所有的drivers。再逐一调用drivers的load函数。
+            driver在初始化时要读取address和tagID的哈希表，此时必须需要验证tagID是否存在。
+            如果load的时候无法查找到tagID对应的tagItem*，或者address不能通过语法检查，则不load该条目。
+2、address的更新： driver定时更新与之关联的tagItem。tagItem的value、quality和lastUpdateTime。
+3、数据写：   有两种办法。一种是异步写入。tagItem设置一个标志位，表示当前value是往下写的，不能被更新，且要待driver进入写循环时写入。
+            另一种是同步写入。UI调用driverManager的立即写的函数，要求所有driver搜索（tagID）并写值。
+4、UI修改driver：停止driver，修改连接参数，重启driver
+5、UI新增driver：根据一个模板新建一个driver，driverManager中生成UUID，并把driverID和driver*记录到哈希表中。新的driver没有任何address。
+6、UI复制driver：新建一个tagItem，tagManager中生成UUID，新的tagItem=老的tagItem。同时要通知每个driver，同步复制address
+7、UI删除driver：停止driver，删除driver中的address，再删除driver。
+
+8、UI修改tag：输入tag的address会立即调用driver的verify函数。如果通过，则在driver的哈希表上增加一个记录。若tagItem的address清空，则在driver的哈希表上删除对应记录
+9、UI新增tag：新的tag没有任何address。
+10、UI复制tag：新建一个tagItem，要通知每个driver，同步复制address
+11、UI删除tag：先删除driver中的address，再删除tagItem。
+
+三、driver
+1、接口：
+    iLoadSave（存储操作）
+    baseDevice（标准状态、属性、错误等）
+    iDriverUpdate（更新tagItem功能）
+    iDriverCommon（读写\修改参数操作）
+    iDriverModifyAddress（处理address，新增、删除、搜索、verify等）
+
+四、repeater
+1、接口：
+    iLoadSave（存储操作）
+    baseDevice（标准状态、属性、错误等）
+    iDriverCommon（读写\修改参数操作）
+    iDriverModifyAddress（处理address，新增、删除、搜索、verify等）
+
+五、driverManager
+1、接口：
+    iLoadSave（存储操作）
+    baseDevice（标准状态、属性、错误等）
+    iDriverManagerOperateDriver（新增、修改、复制、拷贝、粘贴、剪切、删除等）
+    iDriverManagerActiviateDriver（driver的激活控制）。
+
+todo
+1、消息汇总，标准化、可组态
